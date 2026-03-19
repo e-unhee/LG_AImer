@@ -85,6 +85,12 @@ def scaled_mm_kernel(
     scale_a_ptrs = scale_a_ptr + offsets_scale_am
     scale_b_ptrs = scale_b_ptr + offsets_scale_bn
 
+    ## 1차원으로 데이터 로드
+    scale_b = tl.load(scale_b_ptrs, masks_scale_bn)
+    ## 2차원으로 확장
+    scale_b = scale_b[None, :].broadcast_to((1, BLOCK_SIZE_N))
+
+
     for k in range(0, tl.cdiv(K, BLOCK_SIZE_K)):
         masks_k = offsets_k < K
         masks_a = masks_am[:, None] & masks_k[None, :]
@@ -93,8 +99,11 @@ def scaled_mm_kernel(
         masks_b = masks_k[:, None] & masks_bn[None, :]
         b = tl.load(b_ptrs, mask=masks_b)
 
+        ## 커스터마이징
+        b_scaled = b.to(tl.float32) * scale_b
+
         # Accumulate results.
-        accumulator = tl.dot(a, b, accumulator, out_dtype=accumulator_dtype)
+        accumulator = tl.dot(a, b_scaled, accumulator)
 
         offsets_k += BLOCK_SIZE_K
         a_ptrs += BLOCK_SIZE_K * stride_ak
@@ -102,17 +111,19 @@ def scaled_mm_kernel(
 
     # Apply scale at end.
     masks_scale_a = masks_scale_am[:, None] & (tl.arange(0, 1) < 1)[:, None]
-    scale_a = tl.load(scale_a_ptrs[:, None], masks_scale_a)
+
+    ## 1차원으로 데이터 로드   
+    scale_a = tl.load(scale_a_ptrs, masks_scale_am)
+
     # Need to broadcast to the appropriate size, if scale_a is already
     # (BLOCK_SIZE_M, 1) then it will broadcast to its own shape. Same goes
     # for scale_b below.
-    scale_a = scale_a.broadcast_to((BLOCK_SIZE_M, 1))
+
+    ## 2차원으로 확장
+    scale_a = scale_a[:, None].broadcast_to((BLOCK_SIZE_M, 1))
     accumulator = scale_a * accumulator.to(tl.float32)
 
-    masks_scale_b = masks_scale_bn[:, None] & (tl.arange(0, 1) < 1)[None, :]
-    scale_b = tl.load(scale_b_ptrs[:, None], masks_scale_b)
-    scale_b = scale_b.broadcast_to((BLOCK_SIZE_N, 1))
-    accumulator = scale_b.T * accumulator.to(tl.float32)
+    ## scale_b를 앞에서 처리했기 때문에 삭제
 
     # Convert to output format.
     c = accumulator.to(c_ptr.type.element_ty)
