@@ -38,6 +38,8 @@ def scaled_mm_kernel(
     BLOCK_SIZE_K: tl.constexpr,
     BLOCK_SIZE_SCALE_A: tl.constexpr,
     BLOCK_SIZE_SCALE_B: tl.constexpr,
+    # 커널 실행 옵션 추가
+    num_warps=8,
 ):
     pid = tl.program_id(axis=0)
 
