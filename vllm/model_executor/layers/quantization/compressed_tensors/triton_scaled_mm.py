@@ -188,17 +188,21 @@ def triton_scaled_mm(
 
     has_scalar = lambda x: x.shape[0] == 1 and x.shape[1] == 1
 
-    if use_heuristic:
-        is_small_N = N < 8192
-        next_power_of_2_M = max(32, triton.next_power_of_2(M))
-        if next_power_of_2_M <= 32:
-            tile_shape = (64, 64, 256) if is_small_N else (64, 128, 256)
-        elif next_power_of_2_M <= 64:
-            tile_shape = (64, 64, 256)
-        elif next_power_of_2_M <= 128:
-            tile_shape = (64, 128, 128)
-        else:
-            tile_shape = (128, 128, 128)
+    # if use_heuristic:
+    #     is_small_N = N < 8192
+    #     next_power_of_2_M = max(32, triton.next_power_of_2(M))
+    #     if next_power_of_2_M <= 32:
+    #         tile_shape = (64, 64, 256) if is_small_N else (64, 128, 256)
+    #     elif next_power_of_2_M <= 64:
+    #         tile_shape = (64, 64, 256)
+    #     elif next_power_of_2_M <= 128:
+    #         tile_shape = (64, 128, 128)
+    #     else:
+    #         tile_shape = (128, 128, 128)
+
+    # 커스터마이징 2
+    # 휴리스틱 때문에 작은 타일 사이즈 배당 -> 무시하고 큰 사이즈로
+    tile_shape = (128, 256, 128)
 
     block_size_m, block_size_n, block_size_k = tile_shape
 
