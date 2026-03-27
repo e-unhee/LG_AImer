@@ -204,7 +204,7 @@ def triton_scaled_mm(
 
     # 커스터마이징 2
     # 휴리스틱 때문에 작은 타일 사이즈 배당 -> 무시하고 큰 사이즈로
-    tile_shape = (128, 256, 128)
+    tile_shape = (128, 128, 256)
 
     block_size_m, block_size_n, block_size_k = tile_shape
 
