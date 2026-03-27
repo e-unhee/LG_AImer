@@ -38,9 +38,8 @@ def scaled_mm_kernel(
     BLOCK_SIZE_K: tl.constexpr,
     BLOCK_SIZE_SCALE_A: tl.constexpr,
     BLOCK_SIZE_SCALE_B: tl.constexpr,
-    GROUP_SIZE_M=8,
     # 커널 실행 옵션 추가
-    num_warps=16,
+    num_warps=8,
 ):
     pid = tl.program_id(axis=0)
 
@@ -205,7 +204,7 @@ def triton_scaled_mm(
 
     # 커스터마이징 2
     # 휴리스틱 때문에 작은 타일 사이즈 배당 -> 무시하고 큰 사이즈로
-    tile_shape = (64, 128, 256)
+    tile_shape = (128, 128, 256)
 
     block_size_m, block_size_n, block_size_k = tile_shape
 
