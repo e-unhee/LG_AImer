@@ -100,7 +100,7 @@ def scaled_mm_kernel(
         b = tl.load(b_ptrs, mask=masks_b)
 
         ## 커스터마이징
-        b_scaled = b.to(tl.float32) * scale_b
+        b_scaled = b.to(tl.float32)
 
         # Accumulate results.
         accumulator = tl.dot(a, b_scaled, accumulator)
@@ -121,7 +121,8 @@ def scaled_mm_kernel(
 
     ## 2차원으로 확장
     scale_a = scale_a[:, None].broadcast_to((BLOCK_SIZE_M, 1))
-    accumulator = scale_a * accumulator.to(tl.float32)
+    # scale_b까지 루프 밖에서 계산
+    accumulator = scale_a * accumulator.to(tl.float32) * scale_b
 
     ## scale_b를 앞에서 처리했기 때문에 삭제
 
