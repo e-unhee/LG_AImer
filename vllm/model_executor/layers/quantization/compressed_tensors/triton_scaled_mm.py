@@ -202,9 +202,24 @@ def triton_scaled_mm(
     #     else:
     #         tile_shape = (128, 128, 128)
 
-    # 커스터마이징 2
-    # 휴리스틱 때문에 작은 타일 사이즈 배당 -> 무시하고 큰 사이즈로
-    tile_shape = (128, 128, 256)
+    ## 커스터마이징 - 예성
+    if use_heuristic:
+        # L4 GPU 최적화: SM 72개, INT8 연산 특화
+        # L4는 A100보다 SM이 적으므로 타일 크기를 적절히 조정
+        is_small_N = N < 8192
+        next_power_of_2_M = max(32, triton.next_power_of_2(M))
+        if next_power_of_2_M <= 32:
+            tile_shape = (64, 128, 64) if is_small_N else (64, 256, 64)
+        elif next_power_of_2_M <= 64:
+            tile_shape = (64, 128, 64)
+        elif next_power_of_2_M <= 128:
+            tile_shape = (128, 128, 64)
+        else:
+            tile_shape = (128, 128, 64)
+
+    # # 커스터마이징 2
+    # # 휴리스틱 때문에 작은 타일 사이즈 배당 -> 무시하고 큰 사이즈로
+    # tile_shape = (128, 128, 256)
 
     block_size_m, block_size_n, block_size_k = tile_shape
 
