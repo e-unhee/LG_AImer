@@ -953,6 +953,12 @@ class CompressedTensorsKVCacheMethod(BaseKVCacheMethod):
         #     )
         if num_bits != 8:
             raise NotImplementedError("Only 8-bit quantization is supported.")
+        
+        if type_ not in ["float", "int"]:
+            raise NotImplementedError(
+                f"Currently supported kv cache quantization types are 'float' or 'int', "
+                f"however received type={type_}"
+            )
         ##
 
         # TODO: delegate validation to compressed-tensors library so that we have a
