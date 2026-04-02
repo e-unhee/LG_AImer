@@ -109,4 +109,16 @@ class CompressedTensorsW8A8Int8(CompressedTensorsScheme):
     def apply_weights(
         self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None
     ) -> torch.Tensor:
-        return self.kernel.apply_weights(layer, x, bias)
+        
+        ## 커스터마이징
+        # 기본 커널 x -> 최적화한 커널로 계산 진행
+        from vllm.model_executor.layers.quantization.compressed_tensors.triton_scaled_mm import triton_scaled_mm
+
+        scale_a = getattr(x, "scale_factor", None) 
+        scale_b = getattr(layer, "weight_scale", None)
+
+        if scale_a is None or scale_b is None:
+            return self.kernel.apply_weights(layer, x, bias)
+
+        return triton_scaled_mm(x, layer.weight, scale_a, scale_b, bias)
+        ##
