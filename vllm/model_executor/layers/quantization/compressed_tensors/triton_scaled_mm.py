@@ -91,18 +91,20 @@ def scaled_mm_kernel(
     scale_b = tl.load(scale_b_ptrs, masks_scale_bn)
     ## 2차원으로 확장
     scale_b = scale_b[None, :].broadcast_to((1, BLOCK_SIZE_N))
-
+    
+    ## 커스터마이징 4
+    # ccumulator 타입을 처음부터 tl.float32로
+    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
 
     for k in range(0, tl.cdiv(K, BLOCK_SIZE_K)):
         ## 커스터마이징 1
-        # 마스크 계산 최적화
-        # k_idx는 현재 루프가 시작되는 시점의 절대 위치 -> 이걸로 체크
-        k_idx = k * BLOCK_SIZE_K
+        # 원래대로 ... 
+        masks_k = offsets_k < K
+        masks_a = masks_am[:, None] & masks_k[None, :]
+        a = tl.load(a_ptrs, mask=masks_a)
 
-        mask_k = (k_idx + tl.arange(0, BLOCK_SIZE_K)) < K
-        
-        a = tl.load(a_ptrs, mask=masks_am[:, None] & mask_k[None, :])
-        b = tl.load(b_ptrs, mask=mask_k[:, None] & masks_bn[None, :])
+        masks_b = masks_k[:, None] & masks_bn[None, :]
+        b = tl.load(b_ptrs, mask=masks_b)
 
         ## 커스터마이징 2
         # b를 scale하지 말고 int 그 자체로 전해줘도 ok (커널 수정해서)
@@ -126,10 +128,8 @@ def scaled_mm_kernel(
     scale_a = scale_a[:, None].broadcast_to((BLOCK_SIZE_M, 1))
     
     ## 커스터마이징 3
-    # scale_b까지 루프 밖에서 계산 -> combined_scale로 먼저 곱하고 커널로 전달 (커널 내 연산 감소)
-    # float32로 먼저 만들어서 스케일 동일하게
-    combined_scale = (scale_a * scale_b).to(tl.float32)
-    accumulator = accumulator.to(tl.float32) * combined_scale
+    # scale_b까지 루프 밖에서 계산
+    accumulator = scale_a[:, None] * accumulator.to(tl.float32) * scale_b[None, :]
 
     ## scale_b를 앞에서 처리했기 때문에 삭제
 
