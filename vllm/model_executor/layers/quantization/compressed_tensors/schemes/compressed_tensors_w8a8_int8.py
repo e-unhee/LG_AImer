@@ -119,6 +119,9 @@ class CompressedTensorsW8A8Int8(CompressedTensorsScheme):
 
         if scale_a is None or scale_b is None:
             return self.kernel.apply_weights(layer, x, bias)
+        
+        # 두 스케일 미리 곱해서 전달 -> 커널 내 연산 감소
+        combined_scale = scale_a * scale_b
 
-        return triton_scaled_mm(x, layer.weight, scale_a, scale_b, bias)
+        return triton_scaled_mm(x, layer.weight, combined_scale, bias)
         ##
