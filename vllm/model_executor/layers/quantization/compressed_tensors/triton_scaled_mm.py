@@ -43,10 +43,20 @@ def scaled_mm_kernel(
 ):
     pid = tl.program_id(axis=0)
 
+    num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
     num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
 
-    pid_m = pid // num_pid_n
-    pid_n = pid % num_pid_n
+    ## 커스터마이징
+    # L2 캐시 히트율을 높이는 그룹핑 로직
+    GROUP_SIZE_M: tl.constexpr = 8
+    num_pid_in_group = GROUP_SIZE_M * num_pid_n
+    group_id = pid // num_pid_in_group
+    first_pid_m = group_id * GROUP_SIZE_M
+    group_size_m = min(num_pid_m - first_pid_m, GROUP_SIZE_M)
+
+    # 지그재그 실행 순서
+    pid_m = first_pid_m + ((pid % num_pid_in_group) % group_size_m)
+    pid_n = (pid % num_pid_in_group) // group_size_m
 
     accumulator_dtype = ACCUMULATOR_DTYPE
     accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=accumulator_dtype)
@@ -202,10 +212,8 @@ def triton_scaled_mm(
     #     else:
     #         tile_shape = (128, 128, 128)
 
-    ## 커스터마이징 - 예성
+    ## 커스터마이징 - 채윤
     if use_heuristic:
-        # L4 GPU 최적화: SM 72개, INT8 연산 특화
-        # L4는 A100보다 SM이 적으므로 타일 크기를 적절히 조정
         is_small_N = N < 8192
         next_power_of_2_M = max(32, triton.next_power_of_2(M))
         if next_power_of_2_M <= 32:
